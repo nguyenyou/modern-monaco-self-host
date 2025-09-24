@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Monaco Self-Hosted Example</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background: #2d2d30;
+            padding: 1rem;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ffa500;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.ready {
+            background: #00ff00;
+            animation: none;
+        }
+
+        .status-indicator.error {
+            background: #ff0000;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            width: 250px;
+            background: #252526;
+            border-right: 1px solid #3e3e42;
+            padding: 1rem;
+            overflow-y: auto;
+        }
+
+        .file-tree {
+            list-style: none;
+        }
+
+        .file-item {
+            padding: 0.5rem;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 2px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .file-item:hover {
+            background: #2a2d2e;
+        }
+
+        .file-item.active {
+            background: #094771;
+        }
+
+        .file-icon {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        .editor-container {
+            flex: 1;
+            position: relative;
+        }
+
+        monaco-editor {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(30, 30, 30, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-content {
+            text-align: center;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #3e3e42;
+            border-top: 4px solid #007acc;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .debug-panel {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            background: #2d2d30;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 1rem;
+            max-width: 300px;
+            font-size: 0.8rem;
+            z-index: 1001;
+        }
+
+        .debug-panel h3 {
+            margin-bottom: 0.5rem;
+            color: #007acc;
+        }
+
+        .debug-log {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #1e1e1e;
+            padding: 0.5rem;
+            border-radius: 2px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .debug-log div {
+            margin-bottom: 0.25rem;
+            padding: 0.25rem;
+            border-radius: 2px;
+        }
+
+        .debug-log .success {
+            background: rgba(0, 255, 0, 0.1);
+            color: #90ee90;
+        }
+
+        .debug-log .error {
+            background: rgba(255, 0, 0, 0.1);
+            color: #ffcccb;
+        }
+
+        .debug-log .info {
+            background: rgba(0, 123, 255, 0.1);
+            color: #87ceeb;
+        }
+    </style>
+
+    <!-- Import map configuration for self-hosted modern-monaco -->
+    <script type="importmap">
+    {
+        "imports": {
+            "modern-monaco": "/monaco/index.mjs",
+            "modern-monaco/editor-core": "/monaco/editor-core.mjs",
+            "modern-monaco/lsp": "/monaco/lsp/index.mjs",
+            "modern-monaco/workspace": "/monaco/workspace.mjs",
+            "modern-monaco/cache": "/monaco/cache.mjs",
+            "modern-monaco/editor-worker": "/monaco/editor-worker.mjs"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Modern Monaco Self-Hosted Example</h1>
+        <div class="status">
+            <div class="status-indicator" id="statusIndicator"></div>
+            <span id="statusText">Initializing...</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <h3>📁 Project Files</h3>
+            <ul class="file-tree" id="fileTree">
+                <!-- Files will be populated by JavaScript -->
+            </ul>
+        </div>
+
+        <div class="editor-container">
+            <!-- Modern Monaco lazy loading custom element -->
+            <monaco-editor 
+                theme="vitesse-dark"
+                fontSize="14"
+                fontFamily="'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace"
+                tabSize="2"
+                insertSpaces="true"
+                wordWrap="on"
+                minimap-enabled="true"
+                scrollBeyondLastLine="false">
+            </monaco-editor>
+
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-content">
+                    <div class="spinner"></div>
+                    <div>Loading Monaco Editor...</div>
+                    <div style="font-size: 0.8rem; margin-top: 0.5rem; opacity: 0.7;">
+                        Syntax highlighting loads first, language services follow
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="debug-panel">
+        <h3>🔧 Debug Console</h3>
+        <div class="debug-log" id="debugLog">
+            <div class="info">Debug panel initialized</div>
+        </div>
+    </div>
+
+    <script src="/dist/app.js" type="module"></script>
+</body>
+</html>
